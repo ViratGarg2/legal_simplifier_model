@@ -22,14 +22,15 @@ class SummarizationRequest(BaseModel):
     max_len: Optional[int] = 150
 
 # Initialize model and tokenizer
-MODEL_PATH = "your-username/legal-summarizer"  # Replace with your username
+MODEL_PATH = os.getenv("MODEL_PATH", "./legal-summarizer")
 try:
+    print(f"Loading model from {MODEL_PATH}")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_PATH)
+    print("Model loaded successfully")
 except Exception as e:
-    # Fallback to local model if Hugging Face model is not available
-    tokenizer = AutoTokenizer.from_pretrained("./legal-summarizer")
-    model = AutoModelForSeq2SeqLM.from_pretrained("./legal-summarizer")
+    print(f"Error loading model: {str(e)}")
+    raise
 
 @app.post("/summarize/")
 async def summarize_text(request: SummarizationRequest):
@@ -48,6 +49,7 @@ async def summarize_text(request: SummarizationRequest):
         
         return {"summary": summary}
     except Exception as e:
+        print(f"Error in summarization: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
