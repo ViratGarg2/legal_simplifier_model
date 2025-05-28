@@ -1,18 +1,11 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from typing import Optional
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
-# Load the model and tokenizer from the local path
-local_path = "./legal-summarizer"
-loaded_tokenizer = AutoTokenizer.from_pretrained(local_path)
-loaded_model = AutoModelForSeq2SeqLM.from_pretrained(local_path)
-
-app = FastAPI(title="Legal Text Summarizer API")
+app = FastAPI()
 
 # Add CORS middleware
 app.add_middleware(
@@ -23,64 +16,40 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Mount static files directory if it exists
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
 class SummarizationRequest(BaseModel):
     text: str
-    min_len: int = 50  # default value
-    max_len: int = 150  # default value
+    min_len: Optional[int] = 50
+    max_len: Optional[int] = 150
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    return """
-    <html>
-        <head>
-            <title>Legal Text Summarizer API</title>
-        </head>
-        <body>
-            <h1>Welcome to Legal Text Summarizer API</h1>
-            <p>Use POST /summarize/ endpoint to summarize legal text</p>
-            <p>Example request:</p>
-            <pre>
-            POST /summarize/
-            {
-                "text": "Your legal text here"
-            }
-            </pre>
-        </body>
-    </html>
-    """
-
-@app.get("/summarize/")
-async def summarize_get():
-    return JSONResponse(
-        status_code=405,
-        content={
-            "detail": "Method not allowed. Please use POST request with JSON body containing 'text' field"
-        }
-    )
+# Initialize model and tokenizer
+MODEL_PATH = "your-username/legal-summarizer"  # Replace with your username
+try:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_PATH)
+except Exception as e:
+    # Fallback to local model if Hugging Face model is not available
+    tokenizer = AutoTokenizer.from_pretrained("./legal-summarizer")
+    model = AutoModelForSeq2SeqLM.from_pretrained("./legal-summarizer")
 
 @app.post("/summarize/")
-def summarize(request: SummarizationRequest):
+async def summarize_text(request: SummarizationRequest):
     try:
-        # Prepare the text for the model
-        inputs = loaded_tokenizer.encode("summarize: " + request.text, return_tensors="pt", max_length=512, truncation=True)
-
-        # Generate the summary
-        summary_ids = loaded_model.generate(
-            inputs, 
-            max_length=request.max_len, 
-            min_length=request.min_len, 
-            length_penalty=2.0, 
-            num_beams=4, 
+        # Tokenize and generate summary
+        inputs = tokenizer(request.text, return_tensors="pt", max_length=1024, truncation=True)
+        summary_ids = model.generate(
+            inputs["input_ids"],
+            max_length=request.max_len,
+            min_length=request.min_len,
+            length_penalty=2.0,
+            num_beams=4,
             early_stopping=True
         )
-
-        # Decode the summary
-        summary = loaded_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-
+        summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        
         return {"summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/")
+async def root():
+    return {"message": "Legal Text Summarization API. Use POST /summarize/ to summarize text."}
