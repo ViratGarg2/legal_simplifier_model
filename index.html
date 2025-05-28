@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Legal Text Summarizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #summary {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Legal Text Summarizer</h1>
+    <textarea id="inputText" placeholder="Enter your legal text here..."></textarea>
+    <div style="margin: 10px 0;">
+        <label for="minLen">Minimum Length:</label>
+        <input type="number" id="minLen" value="50" min="10" max="500">
+        
+        <label for="maxLen" style="margin-left: 20px;">Maximum Length:</label>
+        <input type="number" id="maxLen" value="150" min="50" max="500">
+    </div>
+    <button onclick="summarizeText()">Summarize</button>
+    <div id="summary"></div>
+
+    <script>
+        async function summarizeText() {
+            const text = document.getElementById('inputText').value;
+            const minLen = parseInt(document.getElementById('minLen').value);
+            const maxLen = parseInt(document.getElementById('maxLen').value);
+            const summaryDiv = document.getElementById('summary');
+            
+            if (!text) {
+                alert('Please enter some text to summarize');
+                return;
+            }
+
+            if (minLen >= maxLen) {
+                alert('Minimum length must be less than maximum length');
+                return;
+            }
+
+            summaryDiv.innerHTML = 'Generating summary...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/summarize/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        min_len: minLen,
+                        max_len: maxLen
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    summaryDiv.innerHTML = `<h3>Summary:</h3><p>${data.summary}</p>`;
+                } else {
+                    summaryDiv.innerHTML = `Error: ${data.detail || 'Something went wrong'}`;
+                }
+            } catch (error) {
+                summaryDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
